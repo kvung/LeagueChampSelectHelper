@@ -26,11 +26,16 @@ LANE_LABELS = {
 def _base_dir() -> str:
     """Directory to store config.json / champions.json.
 
-    Uses the folder containing the executable when frozen by PyInstaller,
-    otherwise the folder containing this source file.
+    When frozen by PyInstaller, uses %APPDATA%\\LeagueChampSelectHelper so the
+    .exe stays a single clean file and settings survive across runs (a onefile
+    bundle's own directory is a temp extraction that gets wiped on exit).
+    In development, uses the folder containing this source file.
     """
     if getattr(sys, "frozen", False):
-        return os.path.dirname(sys.executable)
+        appdata = os.environ.get("APPDATA") or os.path.expanduser("~")
+        path = os.path.join(appdata, "LeagueChampSelectHelper")
+        os.makedirs(path, exist_ok=True)
+        return path
     return os.path.dirname(os.path.abspath(__file__))
 
 
