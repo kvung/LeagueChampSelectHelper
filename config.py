@@ -15,10 +15,10 @@ from dataclasses import dataclass, field, asdict
 LANES = ("top", "jungle", "middle", "bottom", "utility")
 
 LANE_LABELS = {
-    "top": "Top",
+    "top": "Top Lane",
     "jungle": "Jungle",
-    "middle": "Middle",
-    "bottom": "Bottom (ADC)",
+    "middle": "Mid Lane",
+    "bottom": "Bot Lane",
     "utility": "Support",
 }
 
