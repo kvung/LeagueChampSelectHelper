@@ -6,7 +6,6 @@ venv/
 
 # PyInstaller
 build/
-dist/
 *.spec
 
 # App-generated
