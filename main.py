@@ -25,7 +25,7 @@ def main() -> None:
     champions = load_champions()
 
     app = App(cfg, champions)
-    controller = LcuController(cfg, app.set_status_threadsafe)
+    controller = LcuController(cfg, app.set_status_threadsafe, app.set_info_threadsafe)
 
     thread = threading.Thread(target=_run_lcu, args=(controller,), daemon=True)
     thread.start()

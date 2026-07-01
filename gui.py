@@ -21,6 +21,7 @@ from tkinter import ttk
 
 from config import AppConfig, LANES, LANE_LABELS
 from champions import Champions
+from lcu_client import GameInfo
 
 SLOTS = 3
 _BLANK = ""
@@ -43,8 +44,10 @@ class App:
         self._champ_values = [_BLANK] + self._champ_names
         self._name_by_lower = {n.lower(): n for n in self._champ_names}
         self._combos: dict[str, dict[str, list[ttk.Combobox]]] = {}
+        self._info_queue: "queue.Queue[GameInfo]" = queue.Queue()
 
         self._build_toggles()
+        self._build_game_info()
         self._build_lane_tabs()
         self._build_status_bar()
         self._load_into_widgets()
@@ -66,9 +69,35 @@ class App:
         ttk.Checkbutton(frame, text="Auto Pick", variable=self.var_pick,
                         command=self._on_toggle).grid(row=0, column=2, padx=8, pady=6)
 
+    def _build_game_info(self) -> None:
+        frame = ttk.LabelFrame(self.root, text="Game Information")
+        frame.grid(row=1, column=0, padx=10, pady=4, sticky="ew")
+
+        self._info_vars: dict[str, tk.StringVar] = {
+            "summoner": tk.StringVar(value="—"),
+            "game_status": tk.StringVar(value="Waiting for client…"),
+            "selected_roles": tk.StringVar(value="—"),
+            "champ_select_phase": tk.StringVar(value="—"),
+            "region": tk.StringVar(value="—"),
+        }
+        rows = (
+            ("Summoner:",              "summoner"),
+            ("Game Status:",           "game_status"),
+            ("Selected Roles:",        "selected_roles"),
+            ("Champion Select Phase:", "champ_select_phase"),
+            ("Region:",                "region"),
+        )
+        for r, (label, key) in enumerate(rows):
+            ttk.Label(frame, text=label, width=22, anchor="w").grid(
+                row=r, column=0, padx=(10, 6), pady=2, sticky="w"
+            )
+            ttk.Label(frame, textvariable=self._info_vars[key], anchor="w").grid(
+                row=r, column=1, padx=(6, 10), pady=2, sticky="w"
+            )
+
     def _build_lane_tabs(self) -> None:
         frame = ttk.LabelFrame(self.root, text="Priority per lane (Priority 1 = highest)")
-        frame.grid(row=1, column=0, padx=10, pady=4, sticky="ew")
+        frame.grid(row=2, column=0, padx=10, pady=4, sticky="ew")
 
         notebook = ttk.Notebook(frame)
         notebook.grid(row=0, column=0, padx=6, pady=6, sticky="ew")
@@ -108,7 +137,6 @@ class App:
         return cb
 
     def _on_combo_key(self, event) -> None:
-        # Ignore navigation / modifier keys so filtering doesn't fire on them.
         if event.keysym in _NAV_KEYS:
             return
         cb: ttk.Combobox = event.widget
@@ -118,7 +146,6 @@ class App:
             return
         needle = typed.lower()
         matches = [n for n in self._champ_names if needle in n.lower()]
-        # Empty list breaks the popdown on some Tk builds; fall back to blank.
         cb["values"] = matches if matches else [_BLANK]
 
     def _on_combo_select(self, _event) -> None:
@@ -145,7 +172,7 @@ class App:
     def _build_status_bar(self) -> None:
         self.status_var = tk.StringVar(value="Waiting for League client…")
         bar = ttk.Label(self.root, textvariable=self.status_var, relief="sunken", anchor="w")
-        bar.grid(row=2, column=0, padx=10, pady=(4, 10), sticky="ew")
+        bar.grid(row=3, column=0, padx=10, pady=(4, 10), sticky="ew")
         if not self._champ_names:
             self.status_var.set("No champion data (offline). Connect once to load names.")
 
@@ -185,12 +212,28 @@ class App:
         """Callable from any thread; the Tk thread drains it via after()."""
         self._status_queue.put(message)
 
+    def set_info_threadsafe(self, info: GameInfo) -> None:
+        """Callable from any thread; drained on the Tk thread."""
+        self._info_queue.put(info)
+
     def _drain_status(self) -> None:
         try:
             while True:
                 self.status_var.set(self._status_queue.get_nowait())
         except queue.Empty:
             pass
+        try:
+            latest: GameInfo | None = None
+            while True:
+                latest = self._info_queue.get_nowait()
+        except queue.Empty:
+            pass
+        if latest is not None:
+            self._info_vars["summoner"].set(latest.summoner)
+            self._info_vars["game_status"].set(latest.game_status)
+            self._info_vars["selected_roles"].set(latest.selected_roles)
+            self._info_vars["champ_select_phase"].set(latest.champ_select_phase)
+            self._info_vars["region"].set(latest.region)
         self.root.after(100, self._drain_status)
 
     def run(self) -> None:
