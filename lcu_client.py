@@ -37,16 +37,19 @@ class LcuController:
         self.config = config
         self.status_cb = status_cb
         self._submitted: set[int] = set()
+        self.connector: Connector | None = None
 
-        self.connector = Connector()
-        self.connector.ready(self._on_ready)
-        self.connector.close(self._on_close)
-        self.connector.ws.register(
+    def _build_connector(self) -> Connector:
+        connector = Connector()
+        connector.ready(self._on_ready)
+        connector.close(self._on_close)
+        connector.ws.register(
             "/lol-matchmaking/v1/ready-check", event_types=("CREATE", "UPDATE")
         )(self._on_ready_check)
-        self.connector.ws.register(
+        connector.ws.register(
             "/lol-champ-select/v1/session", event_types=("CREATE", "UPDATE", "DELETE")
         )(self._on_champ_select)
+        return connector
 
     async def _on_ready(self, connection):
         self.status_cb("Connected to League client")
@@ -103,4 +106,5 @@ class LcuController:
 
     def run(self) -> None:
         """Blocking: starts the connector event loop (call from a thread)."""
+        self.connector = self._build_connector()
         self.connector.start()

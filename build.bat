@@ -5,7 +5,7 @@ REM cannot cross-compile a .exe from another OS.
 python -m pip install -r requirements.txt
 if errorlevel 1 goto :error
 
-pyinstaller --onefile --windowed --name LeagueChampSelectHelper main.py
+python -m PyInstaller --onefile --windowed --name LeagueChampSelectHelper main.py
 if errorlevel 1 goto :error
 
 echo.
@@ -16,4 +16,5 @@ goto :eof
 echo.
 echo Build failed. If it was a psutil/AccessDenied error, try:
 echo     python -m pip install -U psutil
+pause
 exit /b 1
